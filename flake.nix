@@ -127,6 +127,23 @@
         # --enable-static it never forces LDFLAGS=-static.
         // lib.optionalAttrs host.isDarwin {
           configureFlags = (old.configureFlags or [ ]) ++ [ "--enable-shared=no" ];
+          # The C++ codec libs (libheif/libjxl/libaom/libde265) pull `-lc++`
+          # via their .pc, which defaults to the dynamic /usr/lib/libc++.1.dylib
+          # — rejected by the unpins darwin portability allowlist (libSystem +
+          # frameworks + libobjc only; libc++ must be folded in statically).
+          # Same fix ffmpeg uses: drop a -L shim exposing the static libc++.a
+          # as libc++.a / libstdc++.a / libc++abi.a ahead of the dylib dirs,
+          # and pass -search_paths_first so ld64 takes the .a instead of its
+          # default -search_dylibs_first (which finds libc++.1.dylib first).
+          preConfigure = ''
+            mkdir -p "$TMPDIR/cxx-static"
+            ln -sf ${p.libcxx}/lib/libc++.a    "$TMPDIR/cxx-static/libc++.a"
+            ln -sf ${p.libcxx}/lib/libc++.a    "$TMPDIR/cxx-static/libstdc++.a"
+            ln -sf ${p.libcxx}/lib/libc++abi.a "$TMPDIR/cxx-static/libc++abi.a"
+            export NIX_LDFLAGS="-L$TMPDIR/cxx-static $NIX_LDFLAGS"
+            export LDFLAGS="-Wl,-search_paths_first ''${LDFLAGS:-}"
+            export LIBS="-lc++abi ''${LIBS:-}"
+          '' + (old.preConfigure or "");
         }
         # mingw: force `pkg-config --static`. pkgsStatic's pkg-config wrapper
         # is static-by-default (the platform is isStatic from the start), but
