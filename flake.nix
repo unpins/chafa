@@ -65,6 +65,14 @@
           });
         in
         p.chafa.overrideAttrs (old: {
+          # Run chafa's test suite (tests/) on native Linux: the build host can
+          # execute the musl-static binary it just produced, so `make check`
+          # runs for real. Cross targets (mingw, and any cross arch) build test
+          # binaries for a foreign machine → checkPhase auto-skips via
+          # canExecute. Darwin-native is left off here (not locally verifiable;
+          # revisit via the Mac builder). See docs/releasing.md "Native test
+          # suite".
+          doCheck = host.isLinux && scope.stdenv.buildPlatform.canExecute host;
           # Add the loader libs nixpkgs' chafa doesn't pull (it ships only
           # glib/libavif/libjxl/librsvg). pkgsStatic propagates only `out`;
           # the .pc lives in .dev, so add both or PKG_CHECK_MODULES misses it.
