@@ -9,18 +9,19 @@ Standalone build of [chafa](https://hpjansson.org/chafa/) — terminal graphics:
 
 Part of the [unpins](https://unpins.org) project — native single-binary builds with no third-party runtime dependencies.
 
-## Installation
+## Usage
 
-Install with [unpin](https://github.com/unpins/unpin):
+Run the `chafa` program with [unpin](https://github.com/unpins/unpin):
 
 ```bash
-unpin chafa
+unpin chafa image.png        # render an image as terminal graphics
+unpin chafa --version
 ```
 
-Or run without installing:
+To install it onto your PATH:
 
 ```bash
-unpin run chafa
+unpin install chafa
 ```
 
 ## Build locally
