@@ -1,13 +1,13 @@
 # chafa
 
-Standalone build of [chafa](https://hpjansson.org/chafa/) — terminal graphics: render images and animations as ANSI/Unicode/sixel/kitty art.
+[chafa](https://hpjansson.org/chafa/) — terminal graphics: render images and animations as ANSI/Unicode/sixel/kitty art. A single self-contained binary, built natively for Linux, macOS, and Windows.
 
 [![CI](https://github.com/unpins/chafa/actions/workflows/chafa.yml/badge.svg)](https://github.com/unpins/chafa/actions)
 ![Linux](https://img.shields.io/badge/Linux-✓-success?logo=linux&logoColor=white)
 ![macOS](https://img.shields.io/badge/macOS-✓-success?logo=apple&logoColor=white)
 ![Windows](https://img.shields.io/badge/Windows-✓-success?logo=windows&logoColor=white)
 
-Part of the [unpins](https://unpins.org) project — native single-binary builds with no third-party runtime dependencies.
+Part of the [unpins](https://unpins.org) catalog; install it with [`unpin`](https://github.com/unpins/unpin): `unpin install chafa`.
 
 ## Usage
 
