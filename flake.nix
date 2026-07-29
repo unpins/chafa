@@ -35,17 +35,11 @@
         let
           lib = scope.lib;
           host = scope.stdenv.hostPlatform;
+          isEngine = lib.hasInfix "unpin-cc" (scope.stdenv.cc.name or "");
           pYuv = scope.extend (final: prev:
             {
               libyuv = ulib.nativeFixes.libyuv prev;
               graphite2 = ulib.nativeFixes.graphite2 prev;
-            } // lib.optionalAttrs host.isRiscV {
-              # riscv64: libjpeg-turbo's RVV SIMD coverage helper fails to
-              # compile (jsimd_can_encode_mcu_AC_refine_prepare undeclared in
-              # the new RVV port). Pulled here via the chafa JPEG loader and
-              # transitively (gdk-pixbuf → libtiff/libwebp). Gate to riscv so
-              # the other arches keep the unmodified (cache-hit) libjpeg.
-              libjpeg = ulib.nativeFixes."libjpeg-turbo" prev;
             } // lib.optionalAttrs host.isDarwin {
               glib = ulib.nativeFixes.glib prev;
               fontconfig = ulib.nativeFixes.fontconfig prev;
@@ -55,7 +49,17 @@
             });
           p = pYuv.extend (final: prev: {
             libavif = ulib.nativeFixes.libavif prev;
-            librsvg = ulib.nativeFixes.librsvg prev;
+            # librsvg (Rust) can't be an engine derivation. On the engine scopes
+            # nix-lib injects a PRISTINE, already-fixed librsvg into
+            # `pkgsStatic.librsvg`; re-applying the fix here would rebuild it —
+            # and its whole pango/cairo/glib chain — inside the engine, where
+            # cairo's csi-replay utility fails to link under full LTO
+            # (`undefined symbol: malloc`). Take the injected attr as-is; only
+            # mingw isn't an engine scope, so the fix still applies there (it
+            # also carries the mingw-only `-lshell32` rustflag). Same as ffmpeg.
+            librsvg = if host.isMinGW
+                      then ulib.nativeFixes.librsvg prev
+                      else prev.librsvg;
             # libjxl: lib-only (drop GDK/GIMP shared plugins + doxygen's
             # graphviz→gd chain that fails to link here).
             libjxl = ulib.nativeFixes.libjxl prev;
@@ -84,11 +88,16 @@
             p.libtiff
             p.libheif
           ]
-          # librsvg-2.0.pc Libs.private carries `-lunwind` only on musl
-          # (rustc's --print=native-static-libs emits it there); a
-          # `pkg-config --static librsvg` consumer must have libunwind.a on
-          # its link path. Not present on darwin/mingw, so gate to musl.
-          ++ lib.optionals host.isMusl [ p.libunwind ]
+          # librsvg-2.0.pc Libs.private carries `-lunwind` on musl (rustc's
+          # --print=native-static-libs emits it there), and the engine driver
+          # appends its own `-lunwind` to every C++ link. Both are served by the
+          # LLVM libunwind in the toolchain's C++ sysroot. nixpkgs' `libunwind`
+          # is the NONGNU one — it defines `_Ux86_64_*` and not a single
+          # `_Unwind_*` — so adding it here only shadows the real unwinder: its
+          # buildInputs `-L` lands ahead of the sysroot's, `-lunwind` binds to
+          # the wrong archive and every `_Unwind_*` from librsvg-2.a and
+          # libc++abi.a goes undefined. Same conclusion ffmpeg reached.
+          ++ lib.optionals (host.isMusl && !isEngine) [ p.libunwind ]
           # chafa's configure adds `-pthread` to the link; mingw gcc maps that
           # to `-lpthread`, which only exists in the winpthreads package
           # (`cannot find -lpthread` otherwise). Same input ffmpeg's mingw
@@ -195,6 +204,12 @@
     ulib.mkStandaloneFlake {
       inherit self;
       name = "chafa";
+
+      # Build via the unpin-llvm engine + emit a bitcode multicall module.
+      engine = "unpin-llvm";
+      multicall = {
+        programs = [{ name = "chafa"; }];
+      };
       smoke = [ "--version" ];
       smokePattern = "Chafa version";
       build = pkgs: mkChafa pkgs.pkgsStatic;
