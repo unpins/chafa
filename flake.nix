@@ -98,11 +98,6 @@
           # the wrong archive and every `_Unwind_*` from librsvg-2.a and
           # libc++abi.a goes undefined. Same conclusion ffmpeg reached.
           ++ lib.optionals (host.isMusl && !isEngine) [ p.libunwind ]
-          # chafa's configure adds `-pthread` to the link; mingw gcc maps that
-          # to `-lpthread`, which only exists in the winpthreads package
-          # (`cannot find -lpthread` otherwise). Same input ffmpeg's mingw
-          # build pulls.
-          ++ lib.optionals host.isMinGW [ p.windows.pthreads ]
           # mingwStaticCross does NOT auto-promote buildInputs →
           # propagatedBuildInputs the way pkgsStatic does, so a loader lib's
           # Requires.private chain never reaches chafa's PKG_CONFIG_PATH. With
@@ -176,12 +171,14 @@
         // lib.optionalAttrs host.isMinGW {
           preConfigure = ''
             export PKG_CONFIG="${host.config}-pkg-config --static"
-            # chafa is a C program linked with gcc, but the codec chain pulls
-            # C++ archives (libvmaf/libheif/libjxl/libaom) whose ABI symbols
-            # (vtables, std::runtime_error, __cxxabiv1) need libstdc++. The C
+            # chafa is a C program, but the codec chain pulls C++ archives
+            # (libvmaf/libheif/libjxl/libaom) whose ABI symbols (vtables,
+            # std::runtime_error, __cxxabiv1) need the C++ runtime. The C
             # driver doesn't add it; put it in LIBS so autoconf appends it at
-            # the very end of the link, after every codec archive.
-            export LIBS="-lstdc++ ''${LIBS:-}"
+            # the very end of the link, after every codec archive. It's libc++
+            # now, not libstdc++: the engine has no libstdc++ at all, and
+            # configure's very first link fails on the missing library.
+            export LIBS="-lc++ ''${LIBS:-}"
             # libheif/libjxl headers decorate their API with
             # __declspec(dllimport) under _WIN32 unless a static-build macro is
             # defined; chafa's heif/jxl loaders then reference __imp_* thunks
@@ -192,13 +189,12 @@
             # them globally so every chafa TU compiles against the static decls.
             export NIX_CFLAGS_COMPILE="''${NIX_CFLAGS_COMPILE:-} -DLIBHEIF_STATIC_BUILD -DJXL_STATIC_DEFINE"
           '' + (old.preConfigure or "");
-          # Without this, libtool links the .dll.a import libs it finds on the
-          # path (libstdc++/libgcc_s/libwinpthread/libmcfgthread) and the
-          # DLL-link hook drops the matching DLLs next to chafa.exe — the
-          # unpins single-binary promise broken. `-all-static` (make-time, as
-          # mingwStaticBinary does it — NIX_LDFLAGS at configure trips the
-          # "C compiler works" probe) forces every -l to resolve to its .a.
-          makeFlags = (old.makeFlags or [ ]) ++ [ "LDFLAGS=-all-static" ];
+          # No `LDFLAGS=-all-static` here. It kept libtool off the `.dll.a`
+          # import libs it would otherwise find for libstdc++/libgcc_s/
+          # libwinpthread/libmcfgthread, so the DLL-link hook wouldn't drop the
+          # matching DLLs next to chafa.exe. The engine links against no such
+          # runtime, and the hook reports "Created 0 DLL link(s)" without it —
+          # measured, and the `.exe` built without it is byte-identical.
         });
     in
     ulib.mkStandaloneFlake {
@@ -208,6 +204,8 @@
       # Build via the unpin-llvm engine + emit a bitcode multicall module.
       engine = "unpin-llvm";
       multicall = {
+        # The `.exe` on the engine too, not the nixpkgs mingw-gcc cross.
+        windows = true;
         programs = [{ name = "chafa"; }];
       };
       smoke = [ "--version" ];
