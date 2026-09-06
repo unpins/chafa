@@ -207,9 +207,43 @@
         # The `.exe` on the engine too, not the nixpkgs mingw-gcc cross.
         windows = true;
         programs = [{ name = "chafa"; }];
+        # Store refs to build-time data dirs the deps bake in: fontconfig's
+        # conf.avail, dejavu's font dir, glib/gettext/gdk-pixbuf locale roots,
+        # pango's (dynamic, hence unusable here) module dir, libthai's break
+        # dictionary. None survives to the user: the released binary runs on a
+        # machine with no /nix/store, so every one of these paths is already a
+        # dangling constant there. Scrubbing drops the closure (65.6 -> 38.5 MB)
+        # without changing behaviour — renders are byte-identical, measured with
+        # /nix/store bind-mounted empty.
+        #
+        # One of them IS read when it exists: fontconfig's built-in fallback
+        # config (compiled into the binary) names the dejavu dir, and that config
+        # takes effect only when no /etc/fonts is found. So on a nix machine with
+        # no system fonts and no /etc/fonts, the pre-scrub binary rendered SVG
+        # text and this one draws missing-glyph boxes. On a user machine both
+        # draw the boxes — the fallback font was never reachable there. That gap
+        # is real but predates this scrub; fixing it means embedding the font in
+        # the VFS payload, which needs fontconfig's directory scan to go through
+        # the VFS. Tracked separately.
+        removeReferences = [
+          "fontconfig-"
+          "dejavu-fonts"
+          "glib-"
+          "gdk-pixbuf-"
+          "pango-"
+          "libthai-"
+          # mingw only: gettext's own share/locale (message catalogues for
+          # gettext's runtime strings, not chafa's). Same class as glib's above.
+          "gettext-"
+        ];
       };
       smoke = [ "--version" ];
-      smokePattern = "Chafa version";
+      # Not just "it ran": chafa is a picture viewer, and every format it can
+      # open is a separate build-time dependency that a defeated configure probe
+      # can drop in silence. Pin the whole loader list. `.*` between the names
+      # because darwin has one more (CoreGraphics, between AVIF and GIF);
+      # measured identical on the other eight targets, cross included.
+      smokePattern = "^Loaders:.*AVIF.*GIF.*HEIF.*JPEG.*JXL.*PNG.*QOI.*SVG.*TIFF.*WebP.*XWD";
       build = pkgs: mkChafa pkgs.pkgsStatic;
       windowsBuild = pkgs: mkChafa (ulib.mingwStaticCross pkgs);
     };
