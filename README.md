@@ -48,5 +48,3 @@ The [Releases](https://github.com/unpins/chafa/releases) page has standalone bin
 - **Full codec:** every image loader is enabled — AVIF, GIF, HEIF, JPEG, JXL, PNG, QOI, SVG, TIFF, WebP, XWD (plus CoreGraphics on macOS). No upstream features disabled.
 - **Windows:** `mingw` cross, single `.exe`, no companion DLLs.
 - **macOS:** static `.a` codec chain linked in; only system frameworks/libSystem stay dynamic.
-
-The full-codec loader chain is wired up across pkgsStatic / cross-darwin / mingw in [`nix-lib/native-overlay`](https://github.com/unpins/nix-lib/tree/main/native-overlay) (`libavif`, `libheif`, `libjxl`, `libyuv`, `graphite2`, …).
