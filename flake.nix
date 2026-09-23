@@ -143,18 +143,14 @@
           # via their .pc, which defaults to the dynamic /usr/lib/libc++.1.dylib
           # — rejected by the unpins darwin portability allowlist (libSystem +
           # frameworks + libobjc only; libc++ must be folded in statically).
-          # Same fix ffmpeg uses: drop a -L shim exposing the static libc++.a
-          # as libc++.a / libstdc++.a / libc++abi.a ahead of the dylib dirs,
-          # and pass -search_paths_first so ld64 takes the .a instead of its
-          # default -search_dylibs_first (which finds libc++.1.dylib first).
+          # `libcxx` is excluded from the engine's stdenv swap, so a -L shim
+          # staging nixpkgs' libc++.a would pair a non-engine archive with
+          # engine-compiled objects; the engine resolves `-lc++` to its own
+          # static libc++ instead. Only -search_paths_first is still needed,
+          # so ld64 takes a .a over the same-named dylib rather than its
+          # default -search_dylibs_first.
           preConfigure = ''
-            mkdir -p "$TMPDIR/cxx-static"
-            ln -sf ${p.libcxx}/lib/libc++.a    "$TMPDIR/cxx-static/libc++.a"
-            ln -sf ${p.libcxx}/lib/libc++.a    "$TMPDIR/cxx-static/libstdc++.a"
-            ln -sf ${p.libcxx}/lib/libc++abi.a "$TMPDIR/cxx-static/libc++abi.a"
-            export NIX_LDFLAGS="-L$TMPDIR/cxx-static $NIX_LDFLAGS"
             export LDFLAGS="-Wl,-search_paths_first ''${LDFLAGS:-}"
-            export LIBS="-lc++abi ''${LIBS:-}"
           '' + (old.preConfigure or "");
         }
         # mingw: force `pkg-config --static`. pkgsStatic's pkg-config wrapper
