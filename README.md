@@ -46,5 +46,4 @@ The [Releases](https://github.com/unpins/chafa/releases) page has standalone bin
 ## Build notes
 
 - **Full codec:** every image loader is enabled — AVIF, GIF, HEIF, JPEG, JXL, PNG, QOI, SVG, TIFF, WebP, XWD (plus CoreGraphics on macOS). No upstream features disabled.
-- **Windows:** `mingw` cross, single `.exe`, no companion DLLs.
-- **macOS:** static `.a` codec chain linked in; only system frameworks/libSystem stay dynamic.
+- **Windows:** built with mingw-w64.
