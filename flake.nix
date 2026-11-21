@@ -49,12 +49,8 @@
             });
           p = pYuv.extend (final: prev: {
             libavif = ulib.nativeFixes.libavif prev;
-            # librsvg (Rust) can't be an engine derivation. On the engine scopes
-            # nix-lib injects a PRISTINE, already-fixed librsvg into
-            # `pkgsStatic.librsvg`; re-applying the fix here would rebuild it —
-            # and its whole pango/cairo/glib chain — inside the engine, where
-            # cairo's csi-replay utility fails to link under full LTO
-            # (`undefined symbol: malloc`). Take the injected attr as-is; only
+            # On the engine scopes nix-lib injects an already-fixed librsvg into
+            # `pkgsStatic.librsvg` (see rustDepsOverlay); take it as-is. Only
             # mingw isn't an engine scope, so the fix still applies there (it
             # also carries the mingw-only `-lshell32` rustflag). Same as ffmpeg.
             librsvg = if host.isMinGW
