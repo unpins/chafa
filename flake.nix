@@ -35,7 +35,6 @@
         let
           lib = scope.lib;
           host = scope.stdenv.hostPlatform;
-          isEngine = lib.hasInfix "unpin-cc" (scope.stdenv.cc.name or "");
           pYuv = scope.extend (final: prev:
             {
               libyuv = ulib.nativeFixes.libyuv prev;
@@ -49,10 +48,11 @@
             });
           p = pYuv.extend (final: prev: {
             libavif = ulib.nativeFixes.libavif prev;
-            # On the engine scopes nix-lib injects an already-fixed librsvg into
-            # `pkgsStatic.librsvg` (see rustDepsOverlay); take it as-is. Only
-            # mingw isn't an engine scope, so the fix still applies there (it
-            # also carries the mingw-only `-lshell32` rustflag). Same as ffmpeg.
+            # nix-lib injects an already-fixed librsvg only into the pkgsStatic
+            # scopes, Linux and darwin (rustDepsOverlay); take it as-is there.
+            # The Windows engine scope gets no injection, so the fix still
+            # applies here (it also carries the `-lshell32` rustflag). Same as
+            # ffmpeg.
             librsvg = if host.isMinGW
                       then ulib.nativeFixes.librsvg prev
                       else prev.librsvg;
@@ -84,16 +84,8 @@
             p.libtiff
             p.libheif
           ]
-          # librsvg-2.0.pc Libs.private carries `-lunwind` on musl (rustc's
-          # --print=native-static-libs emits it there), and the engine driver
-          # appends its own `-lunwind` to every C++ link. Both are served by the
-          # LLVM libunwind in the toolchain's C++ sysroot. nixpkgs' `libunwind`
-          # is the NONGNU one — it defines `_Ux86_64_*` and not a single
-          # `_Unwind_*` — so adding it here only shadows the real unwinder: its
-          # buildInputs `-L` lands ahead of the sysroot's, `-lunwind` binds to
-          # the wrong archive and every `_Unwind_*` from librsvg-2.a and
-          # libc++abi.a goes undefined. Same conclusion ffmpeg reached.
-          ++ lib.optionals (host.isMusl && !isEngine) [ p.libunwind ]
+          # No p.libunwind for librsvg's `-lunwind`: it is the nongnu one and
+          # would shadow the toolchain's LLVM unwinder.
           # mingwStaticCross does NOT auto-promote buildInputs →
           # propagatedBuildInputs the way pkgsStatic does, so a loader lib's
           # Requires.private chain never reaches chafa's PKG_CONFIG_PATH. With
@@ -159,7 +151,7 @@
         # libheif's `-DLIBHEIF_STATIC_BUILD` (Cflags.private) that turns off
         # its `__declspec(dllimport)` decoration. Same consumer-level knob
         # ffmpeg passes as `--pkg-config-flags=--static`. Gated as a separate
-        # attr so native/darwin keep their (cached) preConfigure-less drv.
+        # attr so linux keeps its (cached) preConfigure-less drv.
         // lib.optionalAttrs host.isMinGW {
           preConfigure = ''
             export PKG_CONFIG="${host.config}-pkg-config --static"
@@ -212,11 +204,12 @@
         # config (compiled into the binary) names the dejavu dir, and that config
         # takes effect only when no /etc/fonts is found. So on a nix machine with
         # no system fonts and no /etc/fonts, the pre-scrub binary rendered SVG
-        # text and this one draws missing-glyph boxes. On a user machine both
-        # draw the boxes — the fallback font was never reachable there. That gap
-        # is real but predates this scrub; fixing it means embedding the font in
-        # the VFS payload, which needs fontconfig's directory scan to go through
-        # the VFS. Tracked separately.
+        # text and this one draws missing-glyph boxes. On a user machine the
+        # embedded config's `<dir prefix="xdg">` finds /usr/share/fonts, so the
+        # boxes appear only where the system has no fonts at all — and there
+        # the dejavu fallback was never reachable either. Closing that gap means
+        # embedding a font in the VFS payload, with fontconfig's directory scan
+        # going through the VFS; not done.
         removeReferences = [
           "fontconfig-"
           "dejavu-fonts"
