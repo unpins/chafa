@@ -24,6 +24,10 @@ To install it onto your PATH:
 unpin install chafa
 ```
 
+## Man pages
+
+`chafa.1` is embedded in the binary — read it with `unpin man chafa`.
+
 ## Build locally
 
 ```bash
@@ -45,5 +49,7 @@ The [Releases](https://github.com/unpins/chafa/releases) page has standalone bin
 
 ## Build notes
 
-- **Full codec:** every image loader is enabled — AVIF, GIF, HEIF, JPEG, JXL, PNG, QOI, SVG, TIFF, WebP, XWD (plus CoreGraphics on macOS). No upstream features disabled.
+- **Full codec:** every image loader is enabled — AVIF, GIF, HEIF, JPEG, JXL, PNG, QOI, SVG, TIFF, WebP, XWD (plus CoreGraphics on macOS).
+- **Text in SVGs** uses the system's fonts: fontconfig on Linux, Core Text on
+  macOS and DirectWrite on Windows.
 - **Windows:** built with mingw-w64.
